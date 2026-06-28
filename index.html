@@ -128,6 +128,13 @@ input,select,textarea,button{font-family:inherit}
 .nav-btn.active{color:var(--blue)}
 .nav-btn svg{width:22px;height:22px}
 .date-display{padding:11px 12px;background:var(--card2);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--muted);font-size:15px}
+.date-stepper{display:flex;gap:8px;align-items:stretch}
+.step-btn{padding:11px 14px;background:var(--card2);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--blue);font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap}
+.step-btn:active{background:var(--blue-bg)}
+.date-center{flex:1;position:relative;cursor:pointer}
+.date-show{padding:11px 12px;background:var(--card2);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-size:15px;text-align:center;font-weight:600;height:100%;display:flex;align-items:center;justify-content:center}
+.date-hidden-input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.today-btn{width:100%;margin-top:8px;padding:8px;background:none;border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--muted);font-size:13px;cursor:pointer}
 </style>
 </head>
 <body>
@@ -146,16 +153,25 @@ input,select,textarea,button{font-family:inherit}
   </div>
   <div class="card">
     <div class="card-title">Trade details</div>
-    <div class="row2">
-      <div class="field">
-        <label>Instrument</label>
-        <select id="pair">
-          <option value="">— Select —</option>
-          <option>NAS</option>
-          <option>SPX</option>
-        </select>
+    <div class="field">
+      <label>Instrument</label>
+      <select id="pair">
+        <option value="">— Select —</option>
+        <option>NAS</option>
+        <option>SPX</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Date <span style="color:var(--dim)">— stays set between trades</span></label>
+      <div class="date-stepper">
+        <button type="button" class="step-btn" id="dateMinus">−1 day</button>
+        <div class="date-center">
+          <div class="date-show" id="tradeDateDisplay"></div>
+          <input type="date" id="tradeDate" class="date-hidden-input">
+        </div>
+        <button type="button" class="step-btn" id="datePlus">+1 day</button>
       </div>
-      <div class="field"><label>Date</label><div class="date-display" id="tradeDateDisplay"></div><input type="hidden" id="tradeDate"></div>
+      <button type="button" class="today-btn" id="dateToday">↻ Reset to today</button>
     </div>
     <div class="row3">
       <div class="field"><label>Direction</label>
@@ -354,11 +370,26 @@ function toast(msg) {
   t.textContent = msg; t.classList.add('show');
   setTimeout(function() { t.classList.remove('show'); }, 2500);
 }
-function setDate() {
-  var now = new Date();
-  document.getElementById('tradeDate').value = now.toISOString().split('T')[0];
-  document.getElementById('tradeDateDisplay').textContent = now.toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short', year:'numeric' });
+
+var currentDate = new Date();
+
+function renderDate() {
+  document.getElementById('tradeDate').value = currentDate.toISOString().split('T')[0];
+  document.getElementById('tradeDateDisplay').textContent = currentDate.toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short', year:'numeric' });
 }
+function setDate() { renderDate(); } // alias for init
+
+function shiftDate(days) {
+  currentDate.setDate(currentDate.getDate() + days);
+  renderDate();
+}
+
+document.getElementById('dateMinus').addEventListener('click', function() { shiftDate(-1); });
+document.getElementById('datePlus').addEventListener('click', function() { shiftDate(1); });
+document.getElementById('dateToday').addEventListener('click', function() { currentDate = new Date(); renderDate(); });
+document.getElementById('tradeDate').addEventListener('change', function() {
+  if (this.value) { currentDate = new Date(this.value + 'T00:00:00'); renderDate(); }
+});
 
 // ─── NAV ───
 document.querySelectorAll('.nav-btn').forEach(function(btn) {
@@ -501,7 +532,8 @@ function resetForm() {
   });
   activeTags = {}; activeRules = {};
   document.querySelectorAll('.tag').forEach(function(el) { el.className = 'tag'; });
-  imgDataArr = []; renderImgGrid(); calcRR(); setDate();
+  imgDataArr = []; renderImgGrid(); calcRR();
+  renderDate(); // keep the same date the user set, don't reset to today
 }
 
 // ─── HISTORY ───

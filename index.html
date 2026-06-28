@@ -164,14 +164,17 @@ input,select,textarea,button{font-family:inherit}
     <div class="field">
       <label>Date <span style="color:var(--dim)">— stays set between trades</span></label>
       <div class="date-stepper">
-        <button type="button" class="step-btn" id="dateMinus">−1 day</button>
+        <button type="button" class="step-btn" id="dateMinus">−1</button>
         <div class="date-center">
           <div class="date-show" id="tradeDateDisplay"></div>
-          <input type="date" id="tradeDate" class="date-hidden-input">
         </div>
-        <button type="button" class="step-btn" id="datePlus">+1 day</button>
+        <button type="button" class="step-btn" id="datePlus">+1</button>
       </div>
-      <button type="button" class="today-btn" id="dateToday">↻ Reset to today</button>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button type="button" class="today-btn" id="dateToday" style="margin-top:0">↻ Today</button>
+        <button type="button" class="today-btn" id="dateCalendar" style="margin-top:0;color:var(--blue);border-color:var(--blue)">📅 Pick date</button>
+      </div>
+      <input type="date" id="tradeDate" style="position:absolute;opacity:0;pointer-events:none;width:1px;height:1px">
     </div>
     <div class="row3">
       <div class="field"><label>Direction</label>
@@ -387,6 +390,12 @@ function shiftDate(days) {
 document.getElementById('dateMinus').addEventListener('click', function() { shiftDate(-1); });
 document.getElementById('datePlus').addEventListener('click', function() { shiftDate(1); });
 document.getElementById('dateToday').addEventListener('click', function() { currentDate = new Date(); renderDate(); });
+document.getElementById('dateCalendar').addEventListener('click', function() {
+  var inp = document.getElementById('tradeDate');
+  inp.value = currentDate.toISOString().split('T')[0];
+  if (inp.showPicker) { try { inp.showPicker(); } catch(e) { inp.focus(); inp.click(); } }
+  else { inp.focus(); inp.click(); }
+});
 document.getElementById('tradeDate').addEventListener('change', function() {
   if (this.value) { currentDate = new Date(this.value + 'T00:00:00'); renderDate(); }
 });

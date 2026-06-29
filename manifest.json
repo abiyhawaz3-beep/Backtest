@@ -1,7 +1,7 @@
 {
-  "name": "Backtest Journal",
-  "short_name": "Backtest",
-  "description": "Backtesting trade journal with RR tracking and analytics",
+  "name": "Trade Journal",
+  "short_name": "TradeLog",
+  "description": "Prop firm trade journal with RR tracking and analytics",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#0e0e0e",

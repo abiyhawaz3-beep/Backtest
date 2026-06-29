@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-title" content="TradeLog">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
-<title>Backtest Journal</title>
+<title>Trade Journal</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{
@@ -128,12 +128,6 @@ input,select,textarea,button{font-family:inherit}
 .nav-btn.active{color:var(--blue)}
 .nav-btn svg{width:22px;height:22px}
 .date-display{padding:11px 12px;background:var(--card2);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--muted);font-size:15px}
-.date-stepper{display:flex;gap:8px;align-items:stretch}
-.step-btn{padding:11px 16px;background:var(--card2);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--blue);font-size:15px;font-weight:700;cursor:pointer}
-.step-btn:active{background:var(--blue-bg)}
-.date-center{flex:1}
-.date-show{padding:11px 12px;background:var(--card2);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-size:15px;text-align:center;font-weight:600;height:100%;display:flex;align-items:center;justify-content:center}
-.today-btn{width:100%;margin-top:8px;padding:8px;background:none;border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--muted);font-size:13px;cursor:pointer}
 /* EXIT METHODS */
 .method-box{background:var(--card2);border:1px solid var(--border2);border-radius:var(--radius-sm);padding:12px;margin-bottom:8px}
 .r-quick{display:flex;gap:6px;flex-wrap:wrap}
@@ -169,7 +163,7 @@ input,select,textarea,button{font-family:inherit}
 
 <!-- LOG PAGE -->
 <div class="page active" id="page-log">
-  <div class="page-title">📈 Backtest Log</div>
+  <div class="page-title">📈 Log Trade</div>
   <div class="card">
     <div class="card-title">Chart screenshots <span style="color:var(--muted);font-weight:400">— up to 4</span></div>
     <div class="img-grid" id="imgGrid"></div>
@@ -190,18 +184,7 @@ input,select,textarea,button{font-family:inherit}
           <option>SPX</option>
         </select>
       </div>
-      <div class="field"><label>Date <span style="color:var(--dim)">— stays set between trades</span></label>
-        <div class="date-stepper">
-          <button type="button" class="step-btn" id="dateMinus">−1</button>
-          <div class="date-center"><div class="date-show" id="tradeDateDisplay"></div></div>
-          <button type="button" class="step-btn" id="datePlus">+1</button>
-        </div>
-        <div style="display:flex;gap:8px;margin-top:8px">
-          <button type="button" class="today-btn" id="dateToday" style="margin-top:0">↻ Today</button>
-          <button type="button" class="today-btn" id="dateCalendar" style="margin-top:0;color:var(--blue);border-color:var(--blue)">📅 Pick date</button>
-        </div>
-        <input type="date" id="tradeDate" style="position:absolute;opacity:0;pointer-events:none;width:1px;height:1px">
-      </div>
+      <div class="field"><label>Date</label><div class="date-display" id="tradeDateDisplay"></div><input type="hidden" id="tradeDate"></div>
     </div>
     <div class="row3">
       <div class="field"><label>Direction</label>
@@ -376,6 +359,20 @@ input,select,textarea,button{font-family:inherit}
     <div class="prog-bar"><div class="prog-fill" id="dailyBar" style="width:0%;background:var(--blue)"></div></div>
     <div class="prog-labels"><span id="dailyLeft">Enter P&L above</span><span id="dailyPct"></span></div>
   </div>
+  <div class="section-head">Telegram auto-post</div>
+  <div class="card">
+    <div style="font-size:13px;color:var(--muted);margin-bottom:.75rem;line-height:1.6">Trades auto-post to your Telegram group when saved.</div>
+    <div class="field"><label>Bot token</label><input type="text" id="tg-token" placeholder="1234567890:AAFxxx..." autocomplete="off" autocorrect="off" autocapitalize="none"></div>
+    <div class="field"><label>Group chat ID</label><input type="text" id="tg-chatid" placeholder="-1001234567890" autocomplete="off"></div>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:.75rem">
+      <div style="font-size:13px;color:var(--muted)">Auto-post enabled</div>
+      <div class="toggle" id="tg-toggle"><div class="toggle-knob"></div></div>
+    </div>
+    <button class="action-btn" id="testTgBtn">📨 Send test message</button>
+    <div id="tg-status" style="font-size:12px;color:var(--muted);margin-top:.5rem;text-align:center"></div>
+    <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:1rem;margin-bottom:.5rem">Posted messages — tap 🗑 to delete from group</div>
+    <div id="tg-history"></div>
+  </div>
   <div class="section-head">Backup & restore</div>
   <div class="card">
     <button class="action-btn" id="exportBtn">⬇️ Export backup (JSON)</button>
@@ -410,8 +407,8 @@ input,select,textarea,button{font-family:inherit}
 
 <script>
 // ─── STATE ───
-var trades = JSON.parse(localStorage.getItem('bt_trades') || '[]');
-var checkState = JSON.parse(localStorage.getItem('bt_checks') || '{}');
+var trades = JSON.parse(localStorage.getItem('tj_trades') || '[]');
+var checkState = JSON.parse(localStorage.getItem('tj_checks') || '{}');
 var tgSettings = JSON.parse(localStorage.getItem('tj_tg') || '{"token":"","chatId":"","enabled":false}');
 var imgDataArr = [];
 var activeTags = {};
@@ -432,31 +429,17 @@ var CHECKS = [
 ];
 
 // ─── HELPERS ───
-function saveT() { localStorage.setItem('bt_trades', JSON.stringify(trades)); }
+function saveT() { localStorage.setItem('tj_trades', JSON.stringify(trades)); }
 function toast(msg) {
   var t = document.getElementById('toast');
   t.textContent = msg; t.classList.add('show');
   setTimeout(function() { t.classList.remove('show'); }, 2500);
 }
-var currentDate = new Date();
-function renderDate() {
-  document.getElementById('tradeDate').value = currentDate.toISOString().split('T')[0];
-  document.getElementById('tradeDateDisplay').textContent = currentDate.toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short', year:'numeric' });
+function setDate() {
+  var now = new Date();
+  document.getElementById('tradeDate').value = now.toISOString().split('T')[0];
+  document.getElementById('tradeDateDisplay').textContent = now.toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short', year:'numeric' });
 }
-function setDate() { renderDate(); }
-function shiftDate(days) { currentDate.setDate(currentDate.getDate() + days); renderDate(); }
-document.getElementById('dateMinus').addEventListener('click', function() { shiftDate(-1); });
-document.getElementById('datePlus').addEventListener('click', function() { shiftDate(1); });
-document.getElementById('dateToday').addEventListener('click', function() { currentDate = new Date(); renderDate(); });
-document.getElementById('dateCalendar').addEventListener('click', function() {
-  var inp = document.getElementById('tradeDate');
-  inp.value = currentDate.toISOString().split('T')[0];
-  if (inp.showPicker) { try { inp.showPicker(); } catch(e) { inp.focus(); inp.click(); } }
-  else { inp.focus(); inp.click(); }
-});
-document.getElementById('tradeDate').addEventListener('change', function() {
-  if (this.value) { currentDate = new Date(this.value + 'T00:00:00'); renderDate(); }
-});
 
 // ─── NAV ───
 document.querySelectorAll('.nav-btn').forEach(function(btn) {
@@ -661,6 +644,7 @@ document.getElementById('saveBtn').addEventListener('click', function() {
     imgs: imgDataArr.slice()
   };
   trades.unshift(t); saveT();
+  sendToTelegram(t);
   resetForm();
   toast('Trade saved ✓');
   document.querySelector('[data-page="history"]').click();
@@ -675,7 +659,7 @@ function resetForm() {
   document.querySelectorAll('.tag').forEach(function(el) { el.className = 'tag'; });
   document.querySelectorAll('.yn-btn').forEach(function(el) { el.classList.remove('yes-on','no-on'); });
   document.querySelectorAll('.r-btn').forEach(function(el) { el.classList.remove('on'); });
-  imgDataArr = []; renderImgGrid(); renderTradeScore(); renderDate();
+  imgDataArr = []; renderImgGrid(); renderTradeScore(); setDate();
 }
 
 // ─── HISTORY ───
@@ -726,6 +710,7 @@ function renderHistory() {
       + (t.reason ? '<div class="trade-text" style="color:#aaa;font-style:italic">"' + t.reason + '"</div>' : '')
       + (t.notes ? '<div class="trade-text" style="color:var(--muted)">📝 ' + t.notes + '</div>' : '')
       + imgHtml
+      + '<button class="post-tg-btn" data-id="' + t.id + '" style="width:100%;margin-top:10px;padding:9px;border-radius:var(--radius-sm);border:1px solid var(--blue);background:var(--blue-bg);color:var(--blue);font-size:13px;font-weight:600;cursor:pointer">📨 Post to Telegram</button>'
       + '</div>';
   }).join('');
   c.querySelectorAll('.del-btn').forEach(function(btn) {
@@ -734,6 +719,16 @@ function renderHistory() {
       var id = +this.dataset.id;
       trades = trades.filter(function(t) { return t.id !== id; });
       saveT(); renderHistory(); toast('Deleted');
+    });
+  });
+  c.querySelectorAll('.post-tg-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      if (!tgSettings.enabled || !tgSettings.token || !tgSettings.chatId) {
+        toast('Set up Telegram in Tools first'); return;
+      }
+      var id = +this.dataset.id;
+      var trade = trades.filter(function(t){return t.id===id;})[0];
+      if (trade) { this.textContent = '📨 Posting...'; sendToTelegram(trade); var b=this; setTimeout(function(){b.textContent='📨 Post to Telegram';},2000); }
     });
   });
   c.querySelectorAll('.trade-img-thumb').forEach(function(img) {
@@ -847,11 +842,11 @@ function renderChecklist() {
   document.querySelectorAll('.check-item').forEach(function(el) {
     el.addEventListener('click', function() {
       var i = +this.dataset.idx; checkState[i] = !checkState[i];
-      localStorage.setItem('bt_checks', JSON.stringify(checkState)); renderChecklist();
+      localStorage.setItem('tj_checks', JSON.stringify(checkState)); renderChecklist();
     });
   });
 }
-document.getElementById('resetCheckBtn').addEventListener('click', function() { checkState = {}; localStorage.setItem('bt_checks','{}'); renderChecklist(); });
+document.getElementById('resetCheckBtn').addEventListener('click', function() { checkState = {}; localStorage.setItem('tj_checks','{}'); renderChecklist(); });
 
 // ─── DAILY TARGET ───
 document.getElementById('todayPL').addEventListener('input', updateDaily);
@@ -864,6 +859,124 @@ function updateDaily() {
   document.getElementById('dailyBar').style.background = pct>=100?'var(--green)':pct>=60?'var(--amber)':'var(--blue)';
   document.getElementById('dailyLeft').textContent = pct>=100 ? '✅ Target hit! Stop trading.' : (tgt-pl).toFixed(2)+'% more needed';
   document.getElementById('dailyPct').textContent = pct.toFixed(0)+'%';
+}
+
+// ─── TELEGRAM ───
+function loadTgSettings() {
+  document.getElementById('tg-token').value = tgSettings.token || '';
+  document.getElementById('tg-chatid').value = tgSettings.chatId || '';
+  document.getElementById('tg-toggle').classList.toggle('on', tgSettings.enabled);
+}
+document.getElementById('tg-token').addEventListener('input', function() { tgSettings.token = this.value.trim(); localStorage.setItem('tj_tg', JSON.stringify(tgSettings)); });
+document.getElementById('tg-chatid').addEventListener('input', function() { tgSettings.chatId = this.value.trim(); localStorage.setItem('tj_tg', JSON.stringify(tgSettings)); });
+document.getElementById('tg-toggle').addEventListener('click', function() {
+  tgSettings.enabled = !tgSettings.enabled;
+  this.classList.toggle('on', tgSettings.enabled);
+  localStorage.setItem('tj_tg', JSON.stringify(tgSettings));
+});
+
+async function sendToTelegram(t) {
+  if (!tgSettings.enabled || !tgSettings.token || !tgSettings.chatId) return;
+  var emoji = t.result==='Win'?'📈':t.result==='Loss'?'📉':'➡️';
+  var resEmoji = t.result==='Win'?'✅':t.result==='Loss'?'❌':'〰️';
+  var r = methodRs(t);
+  var hashtags = t.result==='Win'?'#Abiy #Abiynas #Abiynaswin':t.result==='Loss'?'#Abiy #Abiynas #Abiynaslose':'#Abiy #Abiynas #Abiynasbe';
+  var lines = [emoji+' *'+(t.direction?t.direction+' ':'')+t.pair+'*', resEmoji+' Result: *'+(t.result||'—')+'*'];
+  if (t.risk || t.actual) {
+    var moneyLine = '';
+    if (t.risk) moneyLine += '💰 Risked: '+t.risk+'%';
+    if (t.actual) {
+      var sign = t.result==='Loss' ? '−' : '+';
+      var word = t.result==='Loss' ? 'Lost' : t.result==='Win' ? 'Gained' : 'Result';
+      moneyLine += (moneyLine?' · ':'💰 ')+word+': '+sign+t.actual+'%';
+    }
+    if (moneyLine) lines.push(moneyLine);
+  }
+  if (r.trail !== null) lines.push('📈 Trail: *'+(r.trail>=0?'+':'')+r.trail.toFixed(1)+'R*');
+  if (r.fixed !== null) lines.push('🎯 Fixed 3R: *'+(r.fixed>=0?'+':'')+r.fixed.toFixed(1)+'R*');
+  if (r.level !== null) lines.push('📍 Target: *'+(r.level>=0?'+':'')+r.level.toFixed(1)+'R*');
+  if (t.session) lines.push('🕐 Session: '+t.session);
+  if (t.reason) lines.push('📝 '+t.reason);
+  if (t.emotion) lines.push('🧠 '+t.emotion);
+  lines.push(''); lines.push(hashtags);
+  var text = lines.join('\n');
+  try {
+    var imgs = t.imgs&&t.imgs.length ? t.imgs : (t.img?[t.img]:[]);
+    var sentIds = [];
+    if (!imgs.length) {
+      var r1 = await fetch('https://api.telegram.org/bot'+tgSettings.token+'/sendMessage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:tgSettings.chatId,text:text,parse_mode:'Markdown'})});
+      var d1 = await r1.json(); if(d1.ok) sentIds.push(d1.result.message_id);
+    } else if (imgs.length===1) {
+      var blob = await (await fetch(imgs[0])).blob();
+      var fd = new FormData(); fd.append('chat_id',tgSettings.chatId); fd.append('caption',text); fd.append('parse_mode','Markdown'); fd.append('photo',blob,'chart.jpg');
+      var r2 = await fetch('https://api.telegram.org/bot'+tgSettings.token+'/sendPhoto',{method:'POST',body:fd});
+      var d2 = await r2.json(); if(d2.ok) sentIds.push(d2.result.message_id);
+    } else {
+      var ma=[]; var fdm=new FormData(); fdm.append('chat_id',tgSettings.chatId);
+      for(var i=0;i<imgs.length;i++){var b=await (await fetch(imgs[i])).blob();var fn='p'+i+'.jpg';fdm.append(fn,b,fn);var mo={type:'photo',media:'attach://'+fn};if(i===0){mo.caption=text;mo.parse_mode='Markdown';}ma.push(mo);}
+      fdm.append('media',JSON.stringify(ma));
+      var r3=await fetch('https://api.telegram.org/bot'+tgSettings.token+'/sendMediaGroup',{method:'POST',body:fdm});
+      var d3=await r3.json(); if(d3.ok) d3.result.forEach(function(m){sentIds.push(m.message_id);});
+    }
+    if (sentIds.length) {
+      var hist = JSON.parse(localStorage.getItem('tj_tg_msgs')||'[]');
+      hist.unshift({tradeId:t.id,msgIds:sentIds,pair:t.pair,result:t.result,date:t.date});
+      if(hist.length>20) hist=hist.slice(0,20);
+      localStorage.setItem('tj_tg_msgs',JSON.stringify(hist));
+      renderTgHistory();
+    }
+    toast('Posted to Telegram ✓');
+  } catch(e) { toast('Telegram error — check settings'); console.error(e); }
+}
+
+document.getElementById('testTgBtn').addEventListener('click', async function() {
+  var token = document.getElementById('tg-token').value.trim();
+  var chatId = document.getElementById('tg-chatid').value.trim();
+  var status = document.getElementById('tg-status');
+  if (!token||!chatId) { status.textContent='Enter token and chat ID first'; status.style.color='var(--amber)'; return; }
+  status.textContent='Sending...'; status.style.color='var(--muted)';
+  try {
+    var res = await fetch('https://api.telegram.org/bot'+token+'/sendMessage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:chatId,text:'✅ Trade Journal connected!\n\nYour trades will auto-post here.\n\n#Abiy #Abiynas',parse_mode:'Markdown'})});
+    var data = await res.json();
+    if (!data.ok) throw new Error(data.description);
+    tgSettings.token=token; tgSettings.chatId=chatId;
+    localStorage.setItem('tj_tg',JSON.stringify(tgSettings));
+    status.textContent='✅ Connected! Check your Telegram group.'; status.style.color='var(--green)';
+  } catch(e) { status.textContent='❌ Failed: '+e.message; status.style.color='var(--red)'; }
+});
+
+async function deleteTgMsg(tradeId, msgIds) {
+  if (!confirm('Delete this post from Telegram?')) return;
+  var allOk = true;
+  for (var i=0;i<msgIds.length;i++) {
+    try {
+      var res = await fetch('https://api.telegram.org/bot'+tgSettings.token+'/deleteMessage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:tgSettings.chatId,message_id:msgIds[i]})});
+      var d = await res.json(); if(!d.ok) allOk=false;
+    } catch(e) { allOk=false; }
+  }
+  var hist=JSON.parse(localStorage.getItem('tj_tg_msgs')||'[]');
+  hist=hist.filter(function(h){return h.tradeId!==tradeId;});
+  localStorage.setItem('tj_tg_msgs',JSON.stringify(hist));
+  renderTgHistory();
+  toast(allOk?'Deleted from Telegram ✓':'Could not delete — may already be gone');
+}
+
+function renderTgHistory() {
+  var box = document.getElementById('tg-history');
+  if (!box) return;
+  var hist = JSON.parse(localStorage.getItem('tj_tg_msgs')||'[]');
+  if (!hist.length) { box.innerHTML='<div style="font-size:12px;color:var(--muted);text-align:center;padding:.5rem">No posts yet</div>'; return; }
+  box.innerHTML = hist.map(function(h) {
+    var rCls = h.result==='Win'?'val-green':h.result==='Loss'?'val-red':'val-blue';
+    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:.6rem 0;border-bottom:1px solid var(--border)">'
+      +'<div><div style="font-size:13px;font-weight:600">'+h.pair+' — <span class="'+rCls+'">'+h.result+'</span></div>'
+      +'<div style="font-size:11px;color:var(--muted)">'+h.date+'</div></div>'
+      +'<button class="del-tg-btn" data-id="'+h.tradeId+'" data-msgs=\''+JSON.stringify(h.msgIds)+'\' style="padding:5px 10px;border-radius:var(--radius-sm);border:1px solid var(--red);background:none;color:var(--red);font-size:12px;cursor:pointer">🗑 Delete</button>'
+      +'</div>';
+  }).join('');
+  box.querySelectorAll('.del-tg-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() { deleteTgMsg(+this.dataset.id, JSON.parse(this.dataset.msgs)); });
+  });
 }
 
 // ─── BACKUP ───
@@ -917,6 +1030,8 @@ setDate();
 renderImgGrid();
 renderHistory();
 renderChecklist();
+loadTgSettings();
+renderTgHistory();
 </script>
 </body>
 </html>

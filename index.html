@@ -743,18 +743,21 @@ function renderHistory() {
 
 // ─── STATS ───
 function renderStats() {
-  var closed = trades.filter(function(t) { return t.result === 'Win' || t.result === 'Loss'; });
-  var wins = trades.filter(function(t) { return t.result === 'Win'; });
-  var losses = trades.filter(function(t) { return t.result === 'Loss'; });
   if (!trades.length) { document.getElementById('insightsBox').innerHTML = '<div class="insight">Log some trades to see analytics.</div>'; return; }
+  // Missed trades are documented but NOT counted in performance stats — you didn't take them
+  var taken = trades.filter(function(t) { return !(t.tags && t.tags.includes('miss')); });
+  var missedCount = trades.length - taken.length;
+  var closed = taken.filter(function(t) { return t.result === 'Win' || t.result === 'Loss'; });
+  var wins = taken.filter(function(t) { return t.result === 'Win'; });
+  var losses = taken.filter(function(t) { return t.result === 'Loss'; });
   var wr = closed.length ? wins.length / closed.length * 100 : 0;
-  var netPL = trades.reduce(function(s,t) { return s + (t.result==='Win'?1:t.result==='Loss'?-1:0) * (t.actual||0); }, 0);
-  var fomos = trades.filter(function(t) { return t.tags && t.tags.includes('fomo'); });
-  var revs = trades.filter(function(t) { return t.tags && t.tags.includes('rev'); });
+  var netPL = taken.reduce(function(s,t) { return s + (t.result==='Win'?1:t.result==='Loss'?-1:0) * (t.actual||0); }, 0);
+  var fomos = taken.filter(function(t) { return t.tags && t.tags.includes('fomo'); });
+  var revs = taken.filter(function(t) { return t.tags && t.tags.includes('rev'); });
 
-  // ── Exit method scoreboard: sum R for each style across trades that have that method ──
+  // ── Exit method scoreboard: sum R for each style across taken trades that have that method ──
   var sumTrail=0, nTrail=0, sumFixed=0, nFixed=0, sumLevel=0, nLevel=0;
-  trades.forEach(function(t){
+  taken.forEach(function(t){
     var r = methodRs(t);
     if (r.trail !== null) { sumTrail += r.trail; nTrail++; }
     if (r.fixed !== null) { sumFixed += r.fixed; nFixed++; }
@@ -788,8 +791,8 @@ function renderStats() {
   document.getElementById('s-wr').textContent = closed.length ? wr.toFixed(0)+'%' : '—';
   document.getElementById('s-wr').className = 'stat-val ' + (wr>=50?'val-green':'val-red');
   document.getElementById('s-wrsub').textContent = wins.length + 'W / ' + losses.length + 'L';
-  document.getElementById('s-total').textContent = trades.length;
-  document.getElementById('s-totalsub').textContent = closed.length + ' closed';
+  document.getElementById('s-total').textContent = taken.length;
+  document.getElementById('s-totalsub').textContent = closed.length + ' closed' + (missedCount ? ' · ' + missedCount + ' missed' : '');
   document.getElementById('s-best').textContent = bestStyle ? bestStyle.name.replace(/[^a-zA-Z0-9 ]/g,'').trim() : '—';
   document.getElementById('s-bestsub').textContent = bestStyle ? (bestStyle.sum>=0?'+':'')+bestStyle.sum.toFixed(1)+'R total' : '';
   document.getElementById('s-pnl').textContent = (netPL>=0?'+':'')+netPL.toFixed(2)+'%';
@@ -798,8 +801,8 @@ function renderStats() {
   document.getElementById('s-fomosub').textContent = fomos.length ? fomos.filter(function(t){return t.result==='Win';}).length+' won' : 'no data';
   document.getElementById('s-rev').textContent = revs.length;
   document.getElementById('s-revsub').textContent = revs.length ? revs.filter(function(t){return t.result==='Win';}).length+' won' : 'no data';
-  var days = Math.min(trades.filter(function(t){return t.result==='Win'&&t.actual>=0.5;}).slice(0,4).length,4);
-  var acc = trades.slice(0,4).reduce(function(s,t){return s+(t.result==='Win'?t.actual:-(t.actual||0));},0);
+  var days = Math.min(taken.filter(function(t){return t.result==='Win'&&t.actual>=0.5;}).slice(0,4).length,4);
+  var acc = taken.slice(0,4).reduce(function(s,t){return s+(t.result==='Win'?t.actual:-(t.actual||0));},0);
   document.getElementById('propDays').textContent = days+' / 4';
   document.getElementById('propBar').style.width = (days/4*100)+'%';
   document.getElementById('propTotal').textContent = acc.toFixed(2)+'%';
@@ -807,27 +810,28 @@ function renderStats() {
   var sessions = ['London','New York','Asian','Overlap'];
   var sessHTML = '';
   sessions.forEach(function(s) {
-    var st = trades.filter(function(t){return t.session===s&&(t.result==='Win'||t.result==='Loss');});
+    var st = taken.filter(function(t){return t.session===s&&(t.result==='Win'||t.result==='Loss');});
     if (!st.length) return;
     var pct = (st.filter(function(t){return t.result==='Win';}).length/st.length*100).toFixed(0);
     sessHTML += '<div class="bar-wrap"><div class="bar-label"><span>'+s+'</span><span>'+pct+'% ('+st.length+')</span></div><div class="bar-track"><div class="bar-fill" style="width:'+pct+'%;background:'+(pct>=50?'var(--green)':'var(--red)')+'"></div></div></div>';
   });
   document.getElementById('sessionBars').innerHTML = sessHTML || '<div style="color:var(--muted);font-size:13px">Add session to trades</div>';
-  var seq = trades.filter(function(t){return t.result==='Win'||t.result==='Loss';}).map(function(t){return t.result;}).reverse();
+  var seq = taken.filter(function(t){return t.result==='Win'||t.result==='Loss';}).map(function(t){return t.result;}).reverse();
   var mxW=0,mxL=0,cW=0,cL=0;
   seq.forEach(function(r){if(r==='Win'){cW++;cL=0;mxW=Math.max(mxW,cW);}else{cL++;cW=0;mxL=Math.max(mxL,cL);}});
   var last=seq[seq.length-1],curS=0;
   for(var i=seq.length-1;i>=0;i--){if(seq[i]===last)curS++;else break;}
   document.getElementById('streakBox').innerHTML='<div class="streak-box"><span style="font-size:13px;color:var(--muted)">Best win streak</span><span style="font-size:18px;font-weight:700" class="val-green">'+mxW+' in a row</span></div><div class="streak-box"><span style="font-size:13px;color:var(--muted)">Worst loss streak</span><span style="font-size:18px;font-weight:700" class="val-red">'+mxL+' in a row</span></div><div class="streak-box"><span style="font-size:13px;color:var(--muted)">Current streak</span><span style="font-size:18px;font-weight:700;color:'+(last==='Win'?'var(--green)':'var(--red)')+'">'+curS+' '+(last||'—')+'</span></div>';
   var rNames={sl:'SL placed',tp:'TP planned',conf:'Confluence',size:'Correct size',ses:'Right session'};
-  var withRules=trades.filter(function(t){return t.rules&&t.rules.length;});
+  var withRules=taken.filter(function(t){return t.rules&&t.rules.length;});
   var rHTML='';
-  if(withRules.length){Object.keys(rNames).forEach(function(r){var p=(trades.filter(function(t){return t.rules&&t.rules.includes(r);}).length/withRules.length*100).toFixed(0);rHTML+='<div class="bar-wrap"><div class="bar-label"><span>'+rNames[r]+'</span><span>'+p+'%</span></div><div class="bar-track"><div class="bar-fill" style="width:'+p+'%;background:'+(p>=70?'var(--green)':p>=40?'var(--amber)':'var(--red)')+'"></div></div></div>';});}
+  if(withRules.length){Object.keys(rNames).forEach(function(r){var p=(taken.filter(function(t){return t.rules&&t.rules.includes(r);}).length/withRules.length*100).toFixed(0);rHTML+='<div class="bar-wrap"><div class="bar-label"><span>'+rNames[r]+'</span><span>'+p+'%</span></div><div class="bar-track"><div class="bar-fill" style="width:'+p+'%;background:'+(p>=70?'var(--green)':p>=40?'var(--amber)':'var(--red)')+'"></div></div></div>';});}
   document.getElementById('ruleBox').innerHTML=rHTML||'<div style="color:var(--muted);font-size:13px">Tick rules when logging</div>';
   var ins=[];
+  if(missedCount>=1)ins.push({c:'',m:missedCount+' missed trade'+(missedCount>1?'s':'')+' documented (not counted in stats). Review them in History to spot setups to capitalise on next time.'});
   if(fomos.length>=2){var fw=fomos.filter(function(t){return t.result==='Win';}).length/fomos.length*100;ins.push({c:fw<40?'bad':'warn',m:'FOMO trades: '+fomos.length+' logged, '+fw.toFixed(0)+'% win rate. '+(fw<40?'These are hurting your account.':'Compare to your planned trade win rate.')});}
   if(revs.length>=2){var rw=revs.filter(function(t){return t.result==='Win';}).length/revs.length*100;ins.push({c:'bad',m:'Revenge trades: '+revs.length+' with '+rw.toFixed(0)+'% win rate. After a loss, step away for 30 mins.'});}
-  if(avgDiff>0.1&&diffs.length>=3)ins.push({c:'warn',m:'You leave +'+avgDiff.toFixed(2)+'% per trade by trailing vs fixed TP. Over 4 trades that is '+(avgDiff*4).toFixed(2)+'% — more than your payout target.'});
+  if(bestStyle&&withData.length>1){var sec=withData.slice().sort(function(a,b){return b.sum-a.sum;})[1];ins.push({c:'good',m:bestStyle.name.replace(/[^a-zA-Z0-9 ]/g,'').trim()+' is your best exit style at '+(bestStyle.sum>=0?'+':'')+bestStyle.sum.toFixed(1)+'R, beating '+sec.name.replace(/[^a-zA-Z0-9 ]/g,'').trim()+' by +'+(bestStyle.sum-sec.sum).toFixed(1)+'R.'});}
   if(wr>=55&&closed.length>=5)ins.push({c:'good',m:'Strong '+wr.toFixed(0)+'% win rate. At this consistency, 0.5% risk at 1:2 RR clears the prop target in 1 winner per day.'});
   if(wr<40&&closed.length>=5)ins.push({c:'bad',m:'Win rate '+wr.toFixed(0)+'% over '+closed.length+' trades. Review entry criteria — are you at key levels with confluence?'});
   if(!ins.length)ins.push({c:'',m:'Keep logging trades to unlock personalised insights.'});
